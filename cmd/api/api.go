@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Genexis-6/social/internal/env"
+	"github.com/Genexis-6/social/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
@@ -20,6 +21,7 @@ type application struct {
 
 type Config struct {
 	addr string
+	store store.Storage
 }
 
 func LoadConfig()*Config{

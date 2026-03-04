@@ -4,8 +4,10 @@ import (
 	"errors"
 	"log"
 	"net/http"
+
 	"time"
 
+	"github.com/Genexis-6/social/internal/db"
 	"github.com/Genexis-6/social/internal/env"
 	"github.com/Genexis-6/social/internal/store"
 	"github.com/go-chi/chi/v5"
@@ -17,21 +19,41 @@ type application struct {
 	config Config
 }
 
-
-
 type Config struct {
-	addr string
+	addr  string
 	store store.Storage
+	db    dbConfig
 }
 
-func LoadConfig()*Config{
+func LoadConfig() *Config {
 	err := godotenv.Load()
-	if err != nil{
+	if err != nil {
 		log.Fatal(errors.New("No env file founded"))
 	}
-	return &Config{
-		addr: env.GetEnvString("ADDRESS", ":5000"),
+	dbpool, err := db.DbPool(25,25, time.Duration(15*60),)
+	if err != nil{
+		panic(err)
+	
 	}
+	
+	defer dbpool.Close()
+	log.Println("db connection created")
+	return &Config{
+		addr:  env.GetEnvString("ADDRESS", ":5000"),
+		store: *store.NewStorage(dbpool),
+		db: dbConfig{
+			addr: env.GetEnvString("ADDRESS", ":5000"),
+		},
+		
+
+	}
+}
+
+type dbConfig struct {
+	addr         string
+	maxOpenConns int
+	maxIdelConns int
+	maxIdleTime  time.Duration
 }
 
 func (app *application) mount() http.Handler {
@@ -44,8 +66,7 @@ func (app *application) mount() http.Handler {
 	router.Use(middleware.Timeout(60 * time.Second))
 	router.Get("/health", app.health)
 
-
-	router.Route("/v1", func(r chi.Router){
+	router.Route("/v1", func(r chi.Router) {
 		r.Get("/health", app.health)
 	})
 

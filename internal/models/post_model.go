@@ -12,3 +12,11 @@ type PostModel struct {
 	Created_At time.Time `json:"created_at"`
 	Updated_At time.Time `json:"updated_at"`
 }
+
+
+type PostSummary struct {
+    Title      string    `json:"title"`
+    Tags       []string  `json:"tags"`
+    Content    string    `json:"content"`
+    Created_At time.Time `json:"created_at"`
+}

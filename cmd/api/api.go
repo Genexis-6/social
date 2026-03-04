@@ -36,7 +36,7 @@ func LoadConfig() *Config {
 	
 	}
 	
-	defer dbpool.Close()
+	// defer dbpool.Close()
 	log.Println("db connection created")
 	return &Config{
 		addr:  env.GetEnvString("ADDRESS", ":5000"),
@@ -68,6 +68,12 @@ func (app *application) mount() http.Handler {
 
 	router.Route("/v1", func(r chi.Router) {
 		r.Get("/health", app.health)
+		r.Route("/post", func(r chi.Router) {
+			r.Post("/create", app.createUserPost)
+			r.Route("/{postID}", func(r chi.Router){
+				r.Get("/", app.getPostHandler)
+			})
+		})
 	})
 
 	return router

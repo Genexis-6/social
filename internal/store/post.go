@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 
 	"github.com/Genexis-6/social/internal/models"
 	"github.com/lib/pq"
@@ -24,37 +25,13 @@ func (p *PostStore) Create(ctx context.Context, post *models.PostModel) error {
 	return res
 }
 
-func (p *PostStore) GetMultiplePosts(ctx context.Context, userId int64) ([]models.PostSummary, error) {
-	q := `SELECT title, tags, content, created_at FROM post_model WHERE user_id=$1`
-	var posts []models.PostSummary
-
-	res, err := p.db.QueryContext(ctx, q, userId)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Close()
-
-	for res.Next() {
-		var post models.PostSummary
-		if err := res.Scan(&post.Title, pq.Array(&post.Tags), &post.Content, &post.Created_At); err != nil {
-			return nil, err
-		}
-		posts = append(posts, post)
-	}
-
-	if err = res.Err(); err != nil {
-		return nil, err
-	}
-	return posts, nil
-}
-
 func (p *PostStore) GetPostById(ctx context.Context, id int64) (*models.PostModel, error) {
 	q := `
-	SELECT id, title, content, tags, created_at, updated_at FROM post_model WHERE id=$1
+	SELECT id, title, content, tags, created_at, updated_at, user_id, version FROM post_model WHERE id=$1
 	`
 	var post models.PostModel
 
-	err := p.db.QueryRowContext(ctx, q, id).Scan(&post.ID, &post.Title, &post.Content, pq.Array(&post.Tags), &post.Created_At, &post.Updated_At)
+	err := p.db.QueryRowContext(ctx, q, id).Scan(&post.ID, &post.Title, &post.Content, pq.Array(&post.Tags), &post.Created_At, &post.Updated_At, &post.UserId, &post.Version)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return nil, NoResourceFound
@@ -63,4 +40,44 @@ func (p *PostStore) GetPostById(ctx context.Context, id int64) (*models.PostMode
 		return &post, err
 	}
 
+}
+
+func (p *PostStore) DeletePostById(ctx context.Context, id int64) error {
+	q := `
+	DELETE FROM post_model WHERE id=$1
+	`
+	row, err := p.db.ExecContext(ctx, q, id)
+	if err != nil {
+		return err
+	}
+
+	affected, err := row.RowsAffected()
+
+	if affected == 0 {
+		return NoRecordDeleted
+	}
+
+	return err
+}
+
+func (p *PostStore) UpdatePostById(ctx context.Context, post *models.PostModel) error {
+	log.Println(post.UserId)
+	q := `
+	UPDATE post_model SET content=COALESCE($1, post_model.content), created_at=post_model.created_at, updated_at= CURRENT_TIMESTAMP, title=COALESCE($2, post_model.title), version=post_model.version+1  WHERE id=$3 AND user_id=$4 AND version=$5
+	`
+	row, err := p.db.ExecContext(ctx, q, post.Content, post.Title, post.ID, post.UserId, post.Version)
+
+	if err != nil {
+		return err
+	}
+	affected, err := row.RowsAffected()
+	if err != nil {
+		return err
+	}
+	// log.Println(affected)
+	if affected == 0 {
+		return NoUpdateMode
+	}
+
+	return nil
 }
